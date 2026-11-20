@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- build qq-2026-11-20 -->
+<title>AI 趣味群聊</title>
+<script src="/api/plugin/page/bridge-sdk.js"></script>
+<style>
+:root{
+  --bg:#eef0f3; --side:#ffffff; --chatbg:#f7f8fa; --card:#fff; --text:#222;
+  --muted:#888; --primary:#12b7f5; --border:#e5e7eb; --msg-self:#95ec69;
+  --msg-other:#ffffff; --danger:#ff5555; --hover:#f2f6fa; --ok:#22c55e;
+  --shell-max:460px; --chat-bg-img:none; --chat-bg-color:transparent;
+}
+html[data-theme="dark"]{
+  --bg:#0f1113; --side:#1c1f24; --chatbg:#15171a; --card:#22262c; --text:#e8eaed;
+  --muted:#9aa0a6; --border:#2f343b; --msg-other:#2a2f36; --msg-self:#2f5d3a;
+  --hover:#262b31;
+}
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",Roboto,sans-serif}
+
+html,body{height:100%}
+body{overflow:hidden;background:var(--bg);color:var(--text);display:flex;justify-content:center;align-items:stretch}
+.app-shell{
+  position:relative;width:100%;max-width:var(--shell-max);height:100vh;height:100dvh;
+  display:flex;flex-direction:column;overflow:hidden;
+  background:var(--chatbg);box-shadow:0 0 0 1px var(--border),0 6px 28px rgba(0,0,0,.12);
+}
+
+/* ===== 主视图（四个 Tab 页） ===== */
+.main-views{position:relative;flex:1;min-height:0;overflow:hidden}
+.view{position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden;background:var(--bg)}
+.view.active{display:flex}
+.view-head{background:var(--side);padding:14px 16px 10px;border-bottom:1px solid var(--border)}
+.view-head h2{font-size:18px;font-weight:600}
+.view-head .vh-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.view-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+
+/* ===== 会话列表 ===== */
+.conv-item{display:flex;gap:12px;padding:12px 14px;cursor:pointer;align-items:center;background:var(--side);border-bottom:1px solid var(--border)}
+.conv-item:hover{background:var(--hover)}
+.conv-item.pinned{background:var(--hover)}
+.conv-avatar{position:relative;flex-shrink:0}
+.conv-avatar .item-avatar{width:48px;height:48px}
+.status-dot{position:absolute;right:-1px;bottom:-1px;width:13px;height:13px;border-radius:50%;border:2.5px solid var(--side);background:var(--ok)}
+.status-dot.sleep{background:#9aa0a6}
+.status-dot.dining{background:#f59e0b}
+.status-dot.work{background:var(--primary)}
+.conv-main{flex:1;min-width:0}
+.conv-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.conv-name{font-size:15px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conv-time{font-size:11px;color:var(--muted);flex-shrink:0}
+.conv-bottom{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:3px}
+.conv-snippet{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.conv-badges{display:flex;gap:5px;align-items:center;flex-shrink:0}
+.unread-badge{min-width:18px;height:18px;border-radius:9px;background:var(--danger);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;padding:0 5px}
+.mute-ico{font-size:12px;color:var(--muted)}
+.pin-ico{font-size:12px}
+.empty-tip{color:var(--muted);font-size:13px;padding:24px 16px;text-align:center;line-height:1.8}
+
+/* ===== 好友列表 ===== */
+.friend-group-title{font-size:12px;color:var(--muted);padding:10px 16px 4px}
+.friend-item{display:flex;gap:12px;padding:11px 16px;cursor:pointer;align-items:center;background:var(--side);border-bottom:1px solid var(--border)}
+.friend-item:hover{background:var(--hover)}
+.friend-main{flex:1;min-width:0}
+.friend-name{font-size:15px;font-weight:500}
+.friend-meta{font-size:12px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.friend-badge{font-size:11px;color:var(--primary);margin-left:6px}
+
+/* ===== 动态信息流 ===== */
+.moment-card{background:var(--side);margin:10px 12px;border-radius:12px;padding:12px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.moment-head{display:flex;gap:10px;align-items:center}
+.moment-head .item-avatar{width:40px;height:40px}
+.moment-head-main{flex:1;min-width:0}
+.moment-name{font-size:14px;font-weight:500}
+.moment-time{font-size:11px;color:var(--muted)}
+.moment-vis{font-size:10px;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:0 5px;margin-left:6px}
+.moment-content{font-size:14px;line-height:1.6;margin:9px 0;white-space:pre-wrap;word-break:break-word}
+.moment-img{max-width:100%;max-height:240px;border-radius:8px;display:block;cursor:zoom-in;margin-top:4px}
+.moment-acts{display:flex;gap:16px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.moment-act{font-size:13px;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:5px}
+.moment-act.liked{color:var(--danger)}
+.moment-comments{margin-top:8px;display:flex;flex-direction:column;gap:6px}
+.moment-comment{font-size:13px;line-height:1.5;background:var(--bg);border-radius:8px;padding:6px 9px}
+.moment-comment b{font-weight:500}
+.moment-comment .mc-who{color:var(--primary);margin-right:4px}
+.moment-comment-input{display:flex;gap:8px;margin-top:8px}
+.moment-comment-input input{flex:1;border:1px solid var(--border);border-radius:16px;padding:7px 12px;background:var(--bg);color:var(--text);font-size:13px;outline:none}
+.moment-comment-input button{border:none;background:var(--primary);color:#fff;border-radius:16px;padding:7px 14px;font-size:13px;cursor:pointer}
+
+/* ===== 聊天覆盖层 ===== */
+.chat-wrap{position:absolute;inset:0;z-index:30;display:none;flex-direction:column;background:var(--chatbg)}
+.chat-wrap.open{display:flex}
+.chat-header{background:var(--side);display:flex;align-items:center;justify-content:space-between;padding:0 8px 0 6px;border-bottom:1px solid var(--border);z-index:20;min-height:48px}
+.hd-left,.hd-right{display:flex;align-items:center;gap:2px;min-width:0}
+.hd-btn{font-size:17px;cursor:pointer;padding:5px 7px;border-radius:6px;line-height:1;flex-shrink:0}
+.hd-btn:hover{background:var(--hover)}
+.hd-btn.on{background:rgba(34,197,94,.18);color:var(--ok)}
+.chat-title{font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px;cursor:pointer}
+.chat-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.chat-head-main{min-width:0}
+
+/* 禁用浏览器原生 scroll anchoring：懒加载在顶部插入历史时会与我们的
+   手动锚点补偿叠加，导致阅读位置被甩到底部；统一由 JS 控制 */
+.chat-log{overflow-anchor:none}
+.chat-log{
+  flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:12px 10px;
+  overscroll-behavior:contain;scroll-behavior:smooth;
+  background-color:var(--chat-bg-color);
+  background-image:var(--chat-bg-img);
+  background-size:cover;background-position:center;background-repeat:no-repeat;
+}
+.chat-log::-webkit-scrollbar{width:5px}
+.chat-log::-webkit-scrollbar-thumb{background:rgba(128,128,128,.45);border-radius:3px}
+.chat-log.has-bg .msg-bubble{background:rgba(255,255,255,.94)}
+.chat-log.has-bg .msg-wrap.self .msg-bubble{background:rgba(149,236,105,.95)}
+html[data-theme="dark"] .chat-log.has-bg .msg-bubble{background:rgba(42,47,54,.92)}
+html[data-theme="dark"] .chat-log.has-bg .msg-wrap.self .msg-bubble{background:rgba(47,93,58,.94)}
+
+.to-bottom{
+  position:absolute;right:14px;bottom:104px;z-index:24;display:none;
+  border:none;border-radius:16px;padding:6px 12px;font-size:12px;cursor:pointer;
+  background:rgba(0,0,0,.66);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.25)
+}
+.to-bottom.show{display:block}
+
+/* ===== 消息气泡 ===== */
+.msg-wrap{display:flex;gap:8px;margin:10px 0;opacity:0;transform:translateY(6px);transition:all .25s ease}
+.msg-wrap.show{opacity:1;transform:translateY(0)}
+.msg-wrap.self{flex-direction:row-reverse}
+.msg-avatar,.item-avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;background:#ddd;flex-shrink:0}
+.item-avatar{width:32px;height:32px}
+.avatar-fallback{display:flex;align-items:center;justify-content:center;background:var(--primary);color:#fff;font-size:15px;font-weight:600}
+.msg-avatar.avatar-fallback{font-size:17px}
+.msg-avatar.offline{filter:grayscale(.8);opacity:.55}
+.msg-main{min-width:0;max-width:82%;display:flex;flex-direction:column}
+.msg-wrap.self .msg-main{align-items:flex-end}
+.msg-bubble{max-width:100%;padding:8px 10px;border-radius:8px;background:var(--msg-other);border:1px solid var(--border);min-width:0;position:relative}
+.msg-wrap.self .msg-bubble{background:var(--msg-self);border-color:transparent}
+.msg-name{font-size:12px;color:var(--muted);margin-bottom:4px}
+.msg-wrap.self .msg-name{text-align:right}
+.msg-content{line-height:1.5;white-space:pre-wrap;word-break:break-word;font-size:14px}
+.msg-emoji{height:22px;vertical-align:middle;margin:0 3px}
+.msg-img{max-width:100%;max-height:300px;border-radius:6px;display:block;cursor:zoom-in;margin-top:2px}
+.mention{color:#0a7fb8;font-weight:600}
+html[data-theme="dark"] .mention{color:#5cc8ff}
+.msg-time{font-size:11px;color:var(--muted);margin-top:2px;padding:0 2px}
+.sys-tip{text-align:center;font-size:12px;color:var(--muted);margin:8px 0}
+
+/* ===== 输入栏 ===== */
+.input-bar{background:var(--side);padding:8px;border-top:1px solid var(--border);position:relative;z-index:30}
+.input-row{display:flex;gap:4px;align-items:flex-end}
+.tool-btn{font-size:19px;padding:6px 5px;cursor:pointer;line-height:1;flex-shrink:0;border-radius:6px}
+.tool-btn:hover{background:var(--hover)}
+#msgInput{flex:1;min-width:0;border:1px solid var(--border);border-radius:18px;padding:10px 12px;outline:none;resize:none;height:42px;max-height:120px;background:var(--card);color:var(--text);font-size:14px;line-height:1.4}
+.send-btn{background:var(--primary);color:#fff;border:none;border-radius:18px;padding:10px 14px;cursor:pointer;flex-shrink:0;font-size:14px}
+.input-sub{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;min-height:20px}
+.auto-btn{background:var(--ok);color:#fff;border:none;border-radius:14px;padding:4px 11px;cursor:pointer;font-size:12px;flex-shrink:0;display:flex;align-items:center;gap:5px}
+.auto-btn.running{background:#f59e0b}
+.auto-dot{width:7px;height:7px;border-radius:50%;background:#fff;opacity:.35}
+.auto-btn.running .auto-dot{opacity:1;animation:agcPulse 1.1s infinite}
+@keyframes agcPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.5);opacity:.45}}
+.send-btn:disabled,.auto-btn:disabled{opacity:.55;cursor:not-allowed}
+
+/* 表情面板：双标签 */
+.emo-panel{
+  position:absolute;left:8px;right:8px;bottom:calc(100% - 2px);
+  background:var(--card);border-radius:10px;padding:10px;display:none;
+  border:1px solid var(--border);z-index:40;max-height:230px;overflow:hidden;flex-direction:column;
+  box-shadow:0 -4px 18px rgba(0,0,0,.16)
+}
+.emo-panel.show{display:flex}
+.emo-tabs{display:flex;gap:6px;margin-bottom:8px}
+.emo-tab{font-size:12px;padding:4px 12px;border-radius:12px;background:var(--hover);cursor:pointer;color:var(--muted)}
+.emo-tab.active{background:var(--primary);color:#fff}
+.emo-grid{overflow-y:auto;display:grid;grid-template-columns:repeat(8,1fr);gap:4px}
+.emo-option{width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;cursor:pointer;background:var(--hover)}
+.emo-uni{font-size:22px;text-align:center;cursor:pointer;padding:3px 0;border-radius:4px;line-height:1.3}
+.emo-uni:hover{background:var(--hover)}
+.emo-empty{grid-column:1/-1;color:var(--muted);font-size:12px;text-align:center;padding:8px 0;line-height:1.7}
+
+/* @提及浮层 */
+.mention-panel{
+  position:absolute;left:8px;right:8px;bottom:calc(100% - 2px);
+  background:var(--card);border-radius:10px;border:1px solid var(--border);
+  z-index:41;display:none;overflow:hidden;box-shadow:0 -4px 18px rgba(0,0,0,.16);max-height:200px;overflow-y:auto
+}
+.mention-panel.show{display:block}
+.mention-item{display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;font-size:13px}
+.mention-item:hover,.mention-item.active{background:rgba(18,183,245,.14)}
+.mention-item .item-avatar{width:26px;height:26px}
+.mention-tip{padding:8px 10px;color:var(--muted);font-size:12px}
+
+/* 图片附件预览 */
+.attach-preview{display:none;align-items:center;gap:8px;margin-bottom:6px;padding:6px;background:var(--hover);border-radius:8px}
+.attach-preview.show{display:flex}
+.attach-preview img{width:46px;height:46px;object-fit:cover;border-radius:6px}
+.attach-preview .ap-name{flex:1;min-width:0;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.attach-preview button{border:none;background:var(--danger);color:#fff;border-radius:4px;padding:3px 9px;font-size:12px;cursor:pointer}
+.picked-emo{font-size:12px;color:var(--primary);display:none;align-items:center;gap:5px}
+.picked-emo.show{display:flex}
+.picked-emo img{width:18px;height:18px;border-radius:3px}
+.picked-emo .pe-x{cursor:pointer;color:var(--muted);font-size:14px}
+
+/* ===== 资料主页覆盖层 ===== */
+.profile-page{position:absolute;inset:0;z-index:40;display:none;flex-direction:column;background:var(--bg)}
+.profile-page.open{display:flex}
+.profile-head{background:var(--side);display:flex;align-items:center;gap:8px;padding:8px 6px;border-bottom:1px solid var(--border);min-height:48px}
+.profile-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.profile-banner{background:linear-gradient(160deg,#12b7f5,#7c9ef5);padding:26px 16px 54px}
+.profile-card{background:var(--side);margin:-34px 12px 12px;border-radius:14px;padding:16px;box-shadow:0 2px 10px rgba(0,0,0,.08);position:relative}
+.profile-avatar{width:72px;height:72px;border-radius:50%;border:3px solid var(--side);object-fit:cover;background:#ddd}
+.profile-avatar.avatar-fallback{font-size:28px}
+.profile-name-row{display:flex;align-items:center;gap:8px;margin-top:10px}
+.profile-name{font-size:19px;font-weight:600}
+.profile-status{font-size:12px;color:var(--muted)}
+.profile-sign{font-size:13px;color:var(--text);margin-top:6px;line-height:1.5}
+.profile-mood{font-size:12px;color:var(--primary);margin-top:4px}
+.profile-stats{display:flex;gap:0;margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
+.profile-stat{flex:1;text-align:center}
+.profile-stat b{display:block;font-size:16px}
+.profile-stat span{font-size:11px;color:var(--muted)}
+.profile-badge-row{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+.profile-badge-chip{font-size:12px;background:rgba(18,183,245,.12);color:var(--primary);border-radius:12px;padding:3px 10px}
+.profile-actions{display:flex;gap:10px;margin:0 12px 12px}
+.profile-actions button{flex:1;border:none;border-radius:12px;padding:11px;cursor:pointer;font-size:14px}
+.btn-dm{background:var(--primary);color:#fff}
+.btn-poke{background:var(--side);color:var(--text);border:1px solid var(--border)!important}
+.profile-section-title{font-size:13px;font-weight:600;margin:6px 16px 8px;color:var(--muted)}
+
+/* ===== 底部 TabBar ===== */
+.tabbar{display:flex;background:var(--side);border-top:1px solid var(--border);z-index:20}
+.tabbar.hide{display:none}
+.tab-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0 10px;cursor:pointer;color:var(--muted)}
+.tab-item .ti-ico{font-size:20px;line-height:1}
+.tab-item .ti-label{font-size:11px}
+.tab-item.active{color:var(--primary)}
+
+/* ===== 通用弹窗 ===== */
+.mask{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:99}
+.mask.show{display:block}
+.modal{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:480px;max-width:94vw;max-height:84vh;overflow-y:auto;background:var(--card);border-radius:12px;padding:16px}
+.modal h3{margin-bottom:12px;font-size:16px}
+.tab-switch{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap}
+.tab{flex:1;min-width:60px;text-align:center;padding:6px;border-radius:4px;background:var(--hover);cursor:pointer;font-size:13px}
+.tab.active{background:var(--primary);color:#fff}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.form-item{margin:8px 0}
+.form-item label{display:block;font-size:13px;color:var(--muted);margin-bottom:3px}
+.form-item input,.form-item textarea,.form-item select{width:100%;border:1px solid var(--border);border-radius:6px;padding:8px;background:var(--bg);color:var(--text);font-size:13px;outline:none}
+.form-item textarea{min-height:70px;resize:vertical}
+.form-item button,.btn-close,.btn-ghost{border:none;border-radius:6px;padding:7px 12px;cursor:pointer;background:var(--primary);color:#fff;font-size:13px}
+.btn-ghost{background:var(--hover);color:var(--text)}
+.item-card{background:var(--bg);padding:8px;border-radius:6px;margin:6px 0;display:flex;gap:8px;align-items:center}
+.item-info{flex:1;min-width:0}
+.item-info b{font-size:14px}
+.item-info small{color:var(--muted);font-size:12px;word-break:break-all;display:block;margin-top:2px}
+.btn-del{background:var(--danger);color:#fff;border:none;border-radius:4px;font-size:12px;padding:4px 8px;cursor:pointer}
+.btn-edit{background:var(--primary);color:#fff;border:none;border-radius:4px;font-size:12px;padding:4px 8px;cursor:pointer}
+.item-card{cursor:pointer}
+.btn-close{margin-top:10px;width:100%;padding:9px;background:var(--hover);color:var(--text)}
+.file-input{display:none}
+.upload-label{color:var(--primary);cursor:pointer;font-size:13px}
+.switch-row{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:13px}
+.switch{width:42px;height:24px;background:#ccc;border-radius:12px;position:relative;cursor:pointer;flex-shrink:0}
+.switch.on{background:var(--primary)}
+.switch::after{content:"";position:absolute;width:18px;height:18px;background:#fff;border-radius:50%;top:3px;left:3px;transition:.2s}
+.switch.on::after{left:21px}
+.summary-item{background:var(--hover);padding:8px;border-radius:6px;margin:6px 0;font-size:13px;line-height:1.4;white-space:pre-wrap}
+.sum-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin:8px 0}
+.sum-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px}
+.sum-time{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sum-acts{display:flex;gap:6px;flex-shrink:0}
+.sum-acts button{border:none;border-radius:4px;padding:3px 9px;font-size:12px;cursor:pointer;background:var(--hover);color:var(--text)}
+.sum-acts button.danger{background:var(--danger);color:#fff}
+.sum-text{font-size:13px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+.row-btns{display:flex;gap:8px;margin:6px 0;flex-wrap:wrap}
+.row-btns button{border:none;border-radius:6px;padding:7px 12px;cursor:pointer;background:var(--primary);color:#fff;font-size:13px}
+.toast{position:fixed;top:58px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;display:none;z-index:500;max-width:84%;text-align:center}
+.toast.show{display:block}
+.toast.err{background:var(--danger)}
+.sec-title{font-size:13px;font-weight:600;margin:12px 0 6px;padding-bottom:4px;border-bottom:1px dashed var(--border)}
+.setting-row{display:flex;align-items:center;justify-content:space-between;padding:13px 4px;border-bottom:1px solid var(--border);font-size:14px;cursor:pointer}
+.setting-row:last-child{border-bottom:none}
+.setting-row .sr-right{color:var(--muted);font-size:13px}
+
+/* 页面内对话框 */
+.dlg-mask{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;z-index:400;align-items:center;justify-content:center;padding:12px}
+.dlg-mask.show{display:flex}
+.dlg-box{width:460px;max-width:96vw;max-height:86vh;overflow-y:auto;background:var(--card);border-radius:12px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.28)}
+.dlg-title{font-size:15px;font-weight:600;margin-bottom:8px}
+.dlg-msg{font-size:13px;line-height:1.6;margin-bottom:4px;white-space:pre-wrap;word-break:break-word}
+.dlg-field{margin:9px 0}
+.dlg-field label{display:block;font-size:13px;color:var(--muted);margin-bottom:3px}
+.dlg-field input,.dlg-field textarea,.dlg-field select{width:100%;border:1px solid var(--border);border-radius:6px;padding:8px;background:var(--bg);color:var(--text);font-size:13px;outline:none}
+.dlg-field input:focus,.dlg-field textarea:focus{border-color:var(--primary)}
+.dlg-field textarea{min-height:100px;resize:vertical}
+.dlg-hint{display:block;color:var(--muted);font-size:12px;margin-top:3px;line-height:1.6}
+.dlg-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.dlg-foot button{border:none;border-radius:6px;padding:8px 18px;cursor:pointer;font-size:13px;background:var(--hover);color:var(--text)}
+.dlg-foot .dlg-ok{background:var(--primary);color:#fff}
+
+/* 背景设置 */
+.bg-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0}
+.bg-cell{aspect-ratio:1;border-radius:8px;border:2px solid var(--border);cursor:pointer;position:relative;overflow:hidden;background-size:cover;background-position:center}
+.bg-cell.active{border-color:var(--primary);box-shadow:0 0 0 2px rgba(18,183,245,.3)}
+.bg-cell span{position:absolute;left:0;right:0;bottom:0;font-size:10px;text-align:center;background:rgba(0,0,0,.45);color:#fff;padding:1px 0}
+.bg-cur{display:flex;align-items:center;gap:10px;background:var(--hover);border-radius:8px;padding:8px;margin:6px 0}
+.bg-cur img{width:54px;height:54px;object-fit:cover;border-radius:6px}
+.bg-cur .bc-txt{font-size:12px;color:var(--muted);line-height:1.6}
+
+/* 图片灯箱 */
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;z-index:600;align-items:center;justify-content:center;cursor:zoom-out}
+.lightbox.show{display:flex}
+.lightbox img{max-width:94%;max-height:92%;object-fit:contain;border-radius:6px}
+
+#bootHint{position:fixed;left:12px;bottom:12px;right:12px;max-width:460px;margin:0 auto;background:#fff6e6;border:1px solid #f0c36d;color:#8a5a00;padding:10px 12px;border-radius:8px;font-size:13px;z-index:700;line-height:1.6}
+
+/* 诊断层 */
+#agcNoScript{position:fixed;inset:0;z-index:99999;display:block;background:#b91c1c;color:#fff;padding:28px 32px;font:14px/1.9 Consolas,"Microsoft YaHei",monospace;overflow:auto}
+#agcNoScript h3{font-size:18px;margin-bottom:12px}
+#agcNoScript code{background:rgba(255,255,255,.18);padding:1px 6px;border-radius:4px}
+#agcDiag{position:fixed;left:10px;bottom:10px;z-index:99998;width:360px;max-width:40vw;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font:12px/1.7 Consolas,"Microsoft YaHei",monospace;box-shadow:0 4px 14px rgba(0,0,0,.35);display:none}
+#agcDiag.show{display:block}
+#agcDiagHead{padding:6px 10px;background:#1e293b;border-radius:8px 8px 0 0;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-weight:700}
+#agcDiagBody{padding:8px 10px;max-height:38vh;overflow:auto;white-space:pre-wrap;word-break:break-all}
+#agcDiag.min{width:auto;max-width:220px}
+#agcDiag.min #agcDiagBody{display:none}
+#agcDiag .ok{color:#4ade80}#agcDiag .bad{color:#f87171}#agcDiag .warn{color:#fbbf24}
+#agcDiag .k{color:#94a3b8}
+
+/* ===== v1.9 拟真群聊样式 ===== */
+.typing-row{display:none;align-items:flex-end;gap:8px;padding:0 10px 8px;pointer-events:none}
+.typing-row.show{display:flex}
+.typing-avatars{display:flex;flex-shrink:0}
+.typing-avatar{width:32px;height:32px;border-radius:50%;object-fit:cover;background:#ddd;border:2px solid var(--chatbg);margin-left:-9px;flex-shrink:0}
+.typing-avatar:first-child{margin-left:0}
+.typing-avatar.avatar-fallback{font-size:13px}
+.typing-bubble{display:flex;align-items:center;gap:6px;background:var(--msg-other);border:1px solid var(--border);border-radius:12px;padding:6px 12px;font-size:12px;color:var(--muted);box-shadow:0 2px 8px rgba(0,0,0,.08);max-width:82%}
+.typing-dots{display:inline-flex;gap:1px;margin-left:2px}
+.typing-dots i{font-style:normal;opacity:.25;animation:agcDot 1.2s infinite}
+.typing-dots i:nth-child(2){animation-delay:.18s}
+.typing-dots i:nth-child(3){animation-delay:.36s}
+@keyframes agcDot{0%,100%{opacity:.2;transform:translateY(0)}50%{opacity:1;transform:translateY(-2px)}}
+.chat-wrap.typing-on .to-bottom{bottom:146px}
+
+.msg-reply-to{font-size:11px;color:var(--muted);background:rgba(128,128,128,.12);border-left:2px solid var(--primary);border-radius:3px;padding:2px 6px;margin-bottom:4px}
+.msg-quote{font-size:12px;color:var(--muted);border-left:2px solid var(--border);background:rgba(128,128,128,.10);border-radius:3px;padding:3px 7px;margin-bottom:4px;white-space:pre-wrap;word-break:break-word;max-height:66px;overflow:hidden}
+.msg-recalled{font-size:12px;color:var(--muted);font-style:italic;padding:4px 2px}
+.avatar-blank{background:transparent!important}
+.time-divider{text-align:center;margin:10px 0}
+.time-divider span{display:inline-block;font-size:11px;color:var(--muted);background:rgba(128,128,128,.16);border-radius:8px;padding:1px 9px}
+.msg-status{font-size:11px;color:var(--muted);margin-top:1px;padding:0 2px}
+.msg-status.read{color:var(--ok)}
+.msg-actions{display:none;gap:4px;margin-top:4px}
+.msg-wrap:hover .msg-actions,.msg-wrap.act-open .msg-actions{display:flex}
+.msg-wrap.self .msg-actions{justify-content:flex-end}
+.ma-btn{font-size:12px;line-height:1;cursor:pointer;padding:2px 7px;border-radius:9px;background:var(--hover);color:var(--muted);border:1px solid var(--border)}
+.ma-btn:hover{background:var(--primary);color:#fff}
+.msg-reactions{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
+.msg-wrap.self .msg-reactions{justify-content:flex-end}
+.reaction-chip{font-size:12px;line-height:1;cursor:pointer;padding:2px 7px;border-radius:9px;background:var(--card);border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.reaction-chip:hover{border-color:var(--primary)}
+.react-picker{position:absolute;left:8px;right:8px;bottom:calc(100% - 2px);background:var(--card);border:1px solid var(--border);border-radius:10px;padding:8px 10px;display:none;z-index:42;box-shadow:0 -4px 18px rgba(0,0,0,.16)}
+.react-picker.show{display:block}
+.rp-tip{font-size:11px;color:var(--muted);margin-bottom:4px}
+.rp-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:2px}
+.quote-preview{display:none;align-items:center;gap:8px;margin-bottom:6px;padding:6px 8px;background:var(--hover);border-left:3px solid var(--primary);border-radius:6px}
+.quote-preview.show{display:flex}
+.quote-preview .qp-main{flex:1;min-width:0}
+.quote-preview .qp-label{font-size:11px;color:var(--primary);margin-bottom:1px}
+.quote-preview .qp-text{font-size:12px;color:var(--muted);line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.quote-preview button{border:none;background:var(--danger);color:#fff;border-radius:4px;padding:3px 9px;font-size:12px;cursor:pointer;flex-shrink:0}
+
+/* 长按菜单 */
+.ctx-menu{position:fixed;z-index:800;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 6px 22px rgba(0,0,0,.22);overflow:hidden;min-width:150px}
+.ctx-item{padding:11px 16px;font-size:14px;cursor:pointer}
+.ctx-item:hover{background:var(--hover)}
+.ctx-item.danger{color:var(--danger)}
+
+@media (max-width:520px){
+  .app-shell{max-width:100%;box-shadow:none}
+  .chat-title{max-width:120px}
+}
+
+/* ===================== v2.1.0 新增样式 ===================== */
+/* 表情包独立大气泡：无气泡底、无边框、单独成行，对齐微信/QQ */
+.msg-content .big-emoji{display:block;width:126px;height:126px;object-fit:contain;
+  margin:2px 0;cursor:zoom-in;filter:drop-shadow(0 1px 3px rgba(0,0,0,.18))}
+.msg-bubble.bubble-plain{background:transparent!important;border:none!important;
+  box-shadow:none!important;padding:2px 0!important;max-width:150px}
+.msg-bubble.bubble-plain:hover{filter:none}
+/* 气泡操作条：悬浮在气泡右侧外部，不占内部空间，避免高度跳动 */
+.msg-actions{position:absolute;top:50%;right:-8px;transform:translate(10px,-50%);
+  opacity:0;pointer-events:none;transition:opacity .16s ease,transform .16s ease;
+  display:flex;gap:2px;background:var(--side);border:1px solid var(--border);
+  border-radius:14px;padding:2px 4px;box-shadow:0 2px 8px rgba(0,0,0,.14);z-index:6}
+.msg-wrap.self .msg-actions{right:auto;left:-8px;transform:translate(-10px,-50%)}
+.msg-wrap:hover .msg-actions,.msg-wrap.act-open .msg-actions{opacity:1;pointer-events:auto;transform:translate(0,-50%)}
+@media (hover:none){.msg-actions{display:none}}
+/* 特别关心高亮 */
+.conv-item.special{background:var(--hover)}
+.conv-item.special .conv-name{color:var(--primary);font-weight:600}
+.conv-item.special::before{content:"\2605";color:var(--danger);font-size:12px;margin-right:4px}
+/* 转发引用条 */
+.msg-forward{cursor:pointer}
+.msg-forward .mf-label{color:var(--primary);font-size:12px}
+.msg-forward .mf-body{margin-top:4px;padding-top:4px;border-top:1px dashed var(--border);font-size:12px}
+/* 搜索结果定位高亮 */
+.msg-wrap.flash .msg-bubble{animation:agcflash 1.6s ease 2}
+@keyframes agcflash{0%,100%{box-shadow:none}50%{box-shadow:0 0 0 3px var(--primary)}}
+.load-all-tip{font-size:11px;color:var(--muted);text-align:center;margin:6px 0}
+/* 好友分组标题 */
+.friend-group-title{padding:9px 16px 5px;font-size:12px;color:var(--muted);background:var(--side);
+  cursor:pointer;user-select:none;letter-spacing:.5px}
+.friend-group-title:hover{color:var(--primary)}
+.friend-group-title.collapsed{border-bottom:1px solid var(--border)}
+/* 快捷回复短语 */
+.quick-chips{display:none;flex-wrap:wrap;gap:6px;padding:6px 10px 0}
+.quick-chips.show{display:flex}
+.quick-chip{font-size:12px;color:var(--primary);background:var(--side);border:1px solid var(--border);
+  border-radius:13px;padding:3px 11px;cursor:pointer;white-space:nowrap;max-width:100%;
+  overflow:hidden;text-overflow:ellipsis}
+.quick-chip:hover{background:var(--hover)}
+/* 动态发布栏 */
+.moment-post{display:flex;gap:8px;align-items:center;padding:10px 12px;background:var(--side);
+  border-bottom:1px solid var(--border)}
+.moment-post input{flex:1;border:1px solid var(--border);border-radius:18px;padding:9px 14px;
+  background:var(--bg);color:var(--text);font-size:13px;outline:none}
+.moment-post button{border:none;background:var(--primary);color:#fff;border-radius:18px;
+  padding:8px 14px;font-size:13px;cursor:pointer;white-space:nowrap}
+.moment-post .mp-img-btn{background:var(--bg);color:var(--text);border:1px solid var(--border);
+  font-size:16px;padding:6px 11px}
+.moment-post-attach{display:none;gap:8px;align-items:center;padding:6px 12px;background:var(--side);
+  border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)}
+.moment-post-attach.show{display:flex}
+.moment-post-attach img{width:46px;height:46px;object-fit:cover;border-radius:6px}
+.moment-post-attach button{border:none;background:var(--bg);color:var(--muted);border-radius:10px;
+  padding:3px 10px;font-size:12px;cursor:pointer;border:1px solid var(--border)}
+/* 用户资料设置块 */
+.user-profile-box{display:flex;align-items:center;gap:14px;padding:14px 4px;border-bottom:1px solid var(--border)}
+.user-profile-box .sp-avatar{width:56px;height:56px;border-radius:50%;background:var(--primary);
+  color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer;
+  overflow:hidden;flex:none;border:2px dashed transparent}
+.user-profile-box:hover .sp-avatar{border-color:var(--primary)}
+.sp-avatar img,.sp-avatar .sp-avatar-img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.sp-main{flex:1;min-width:0}
+.sp-main input{width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;
+  background:var(--bg);color:var(--text);font-size:14px;outline:none}
+.sp-hint{font-size:11px;color:var(--muted);margin-top:4px}
+/* 大图查看器导航 */
+.lb-nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:64px;
+  background:rgba(255,255,255,.14);color:#fff;border:none;border-radius:8px;font-size:26px;
+  cursor:pointer;display:none;align-items:center;justify-content:center}
+.lb-nav:hover{background:rgba(255,255,255,.28)}
+#lbPrev{left:14px}
+#lbNext{right:14px}
+.lb-counter{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);color:#ddd;
+  font-size:13px;background:rgba(0,0,0,.4);border-radius:12px;padding:3px 12px}
+</style>
+</head>
+<body>
+
+<div class="app-shell" id="appShell">
+
+  <!-- ===== 主视图：四个 Tab 页 ===== -->
+  <div class="main-views" id="mainViews">
+
+    <section class="view active" id="viewMessages">
+      <div class="view-head">
+        <h2>消息</h2>
+        <div class="vh-sub" id="convSubtitle">所有群聊与私聊会话</div>
+      </div>
+      <div class="view-body" id="convList"></div>
+    </section>
+
+    <section class="view" id="viewFriends">
+      <div class="view-head">
+        <h2>好友</h2>
+        <div class="vh-sub">你的 AI 角色好友</div>
+      </div>
+      <div class="view-body" id="friendList"></div>
+    </section>
+
+    <section class="view" id="viewMoments">
+      <div class="view-head">
+        <h2>动态</h2>
+        <div class="vh-sub">好友与角色的最新说说</div>
+      </div>
+      <div class="moment-post">
+        <input id="momentPostInput" placeholder="发一条说说，角色刷到会自然聊起…">
+        <button class="mp-img-btn" id="momentPostImgBtn" type="button" title="添加图片">🖼️</button>
+        <button id="momentPostBtn" type="button">发布</button>
+        <input type="file" class="file-input" id="momentPostFile" accept="image/*">
+      </div>
+      <div class="moment-post-attach" id="momentPostAttach"></div>
+      <div class="view-body" id="momentList"></div>
+    </section>
+
+    <section class="view" id="viewSettings">
+      <div class="view-head">
+        <h2>设置</h2>
+      </div>
+      <div class="view-body">
+        <div class="user-profile-box" id="rowProfile">
+          <div class="sp-avatar" id="spAvatar" title="点击更换头像">我</div>
+          <div class="sp-main">
+            <input id="spNick" placeholder="我的昵称" maxlength="20">
+            <div class="sp-hint">点头像可更换图片（自动压缩到 256px）；昵称会同步到聊天气泡、动态与会话列表</div>
+          </div>
+          <input type="file" class="file-input" id="spAvatarIn" accept="image/*">
+        </div>
+        <div class="setting-row" id="rowSearchMsg">
+          <span>搜索聊天记录</span><span class="sr-right">关键词 / 按会话 ›</span>
+        </div>
+        <div class="setting-row" id="rowQuick">
+          <span>快捷回复短语</span><span class="sr-right" id="quickRight">配置 ›</span>
+        </div>
+        <div class="setting-row" id="rowTheme">
+          <span>外观主题</span><span class="sr-right" id="themeRight">跟随系统</span>
+        </div>
+        <div class="setting-row" id="rowRoomSettings">
+          <span>聊天室与角色管理</span><span class="sr-right">角色 / 表情 / 自主对话 / 拟真 / 记忆 ›</span>
+        </div>
+        <div class="setting-row" id="rowGlobalMem">
+          <span>全局共享记忆</span><span class="sr-right">查看 / 编辑 ›</span>
+        </div>
+        <div class="setting-row" id="rowClearHistory">
+          <span>清空当前聊天历史</span><span class="sr-right">›</span>
+        </div>
+        <div class="setting-row" id="rowAbout">
+          <span>关于</span><span class="sr-right" id="aboutRight">v2.1.0</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== 聊天覆盖层（群聊 / 私聊复用） ===== -->
+  <div class="chat-wrap" id="chatWrap">
+    <div class="chat-header">
+      <div class="hd-left">
+        <span class="hd-btn" id="btnBack" title="返回消息列表">←</span>
+        <div class="chat-head-main">
+          <div class="chat-title" id="currentRoomName">--</div>
+          <div class="chat-sub" id="currentRoomStatus"></div>
+        </div>
+      </div>
+      <div class="hd-right">
+        <span class="hd-btn" id="btnAutoCfg" title="自主对话设置">🤖</span>
+        <span class="hd-btn" id="btnBg" title="聊天背景">🖼️</span>
+        <span class="hd-btn" id="btnTheme" title="明暗主题">🌗</span>
+        <span class="hd-btn" id="btnSetting" title="聊天室设置">⚙️</span>
+      </div>
+    </div>
+
+    <div class="chat-log" id="chatLog"></div>
+    <button class="to-bottom" id="btnToBottom" type="button">↓ 回到底部</button>
+    <div class="typing-row" id="typingRow"></div>
+    <div class="quick-chips" id="quickChips"></div>
+
+    <div class="input-bar">
+      <div class="mention-panel" id="mentionPanel"></div>
+      <div class="emo-panel" id="emoPanel"></div>
+      <div class="react-picker" id="reactPicker"></div>
+
+      <div class="attach-preview" id="attachPreview">
+        <img id="apThumb" alt="待发送图片">
+        <div class="ap-name" id="apName">图片已就绪</div>
+        <button id="btnApRemove" type="button">移除</button>
+      </div>
+
+      <div class="quote-preview" id="quotePreview"></div>
+
+      <div class="input-row">
+        <span class="tool-btn" id="btnEmo" title="表情">😀</span>
+        <span class="tool-btn" id="btnAt" title="@ 某个角色">@</span>
+        <span class="tool-btn" id="btnImg" title="发送图片（也可粘贴/拖拽）">📷</span>
+        <input type="file" class="file-input" id="imgInput" accept="image/*">
+        <textarea id="msgInput" rows="1" placeholder="输入消息，Enter 发送，@ 提到角色"></textarea>
+        <button class="send-btn" id="btnSend" type="button">发送</button>
+      </div>
+
+      <div class="input-sub">
+        <div class="picked-emo" id="pickedEmo"></div>
+        <button class="auto-btn" id="btnAuto" type="button"><span class="auto-dot"></span><span id="autoBtnText">主动对话</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 资料主页覆盖层 ===== -->
+  <div class="profile-page" id="profilePage">
+    <div class="profile-head">
+      <span class="hd-btn" id="btnProfileBack" title="返回">←</span>
+      <div class="chat-title">资料主页</div>
+    </div>
+    <div class="profile-body" id="profileBody"></div>
+  </div>
+
+  <!-- ===== 底部 TabBar ===== -->
+  <nav class="tabbar" id="tabbar">
+    <div class="tab-item active" data-tab="messages"><span class="ti-ico">💬</span><span class="ti-label">消息</span></div>
+    <div class="tab-item" data-tab="friends"><span class="ti-ico">👤</span><span class="ti-label">好友</span></div>
+    <div class="tab-item" data-tab="moments"><span class="ti-ico">🌟</span><span class="ti-label">动态</span></div>
+    <div class="tab-item" data-tab="settings"><span class="ti-ico">⚙️</span><span class="ti-label">设置</span></div>
+  </nav>
+</div>
+
+<!-- ===== 聊天室设置弹窗（沿用 v1.9 页签） ===== -->
+<div class="mask" id="mask">
+  <div class="modal">
+    <h3>聊天室设置</h3>
+    <div class="tab-switch">
+      <div class="tab active" data-tab="roleTab">角色</div>
+      <div class="tab" data-tab="emojiTab">表情</div>
+      <div class="tab" data-tab="autoTab">自主对话</div>
+      <div class="tab" data-tab="realTab">拟真</div>
+      <div class="tab" data-tab="memTab">记忆</div>
+      <div class="tab" data-tab="sumTab">摘要</div>
+    </div>
+
+    <div class="tab-content active" id="roleTab">
+      <div class="switch-row">
+        <div class="switch" id="switchYoosung"></div>
+        <span>允许读取 AstrBot 私聊记忆（默认关闭）</span>
+      </div>
+      <div id="roleListWrap"></div>
+      <div class="form-item">
+        <label class="upload-label">上传头像<input type="file" class="file-input" id="newAvatarIn" accept="image/*"></label>
+        <input id="rName" placeholder="角色名">
+        <textarea id="rPrompt" placeholder="人设 prompt"></textarea>
+        <button id="btnAddRole" type="button">添加角色</button>
+      </div>
+    </div>
+
+    <div class="tab-content" id="emojiTab">
+      <small>上传的表情图会出现在聊天框😀面板的「表情包」页签；未上传时面板提供内置 Unicode 表情，可直接插入文本。</small>
+      <div id="emojiListWrap"></div>
+      <div class="form-item">
+        <label class="upload-label">上传表情图<input type="file" class="file-input" id="newEmojiIn" accept="image/*"></label>
+        <input id="eName" placeholder="表情名称（给 AI 调用）">
+        <textarea id="eDesc" placeholder="表情描述"></textarea>
+        <button id="btnAddEmoji" type="button">添加表情</button>
+      </div>
+    </div>
+
+    <div class="tab-content" id="autoTab">
+      <div class="switch-row">
+        <div class="switch" id="switchAuto"></div>
+        <span>开启自主对话（角色按设定间隔自动接话）</span>
+      </div>
+      <div class="form-item">
+        <label>间隔时间（秒）</label>
+        <input type="number" id="autoInterval" min="5" max="3600" step="1" value="30">
+        <small class="dlg-hint">每隔这么久触发一轮角色自发对话</small>
+      </div>
+      <div class="form-item">
+        <label>随机偏移（秒）</label>
+        <input type="number" id="autoJitter" min="0" max="600" step="1" value="10">
+        <small class="dlg-hint">实际等待 = 间隔 + 0~偏移 之间的随机秒数，让节奏更像真人</small>
+      </div>
+      <div class="form-item">
+        <label>每轮最多发言角色数</label>
+        <input type="number" id="autoCount" min="0" max="10" step="1" value="0">
+        <small class="dlg-hint">0 = 不限制，由模型自行决定本轮几人接话</small>
+      </div>
+      <div class="row-btns">
+        <button id="btnAutoSave" type="button">保存并应用</button>
+        <button id="btnAutoNow" class="btn-ghost" type="button">立即触发一轮</button>
+      </div>
+      <div class="empty-tip" id="autoStatus">当前状态：未开启</div>
+    </div>
+
+    <div class="tab-content" id="realTab">
+      <div class="sec-title">刷屏与连锁接话</div>
+      <div class="form-item">
+        <label>分段刷屏符号</label>
+        <input id="realSplit" maxlength="2" placeholder="默认 \（留空关闭）">
+        <small class="dlg-hint">角色（以及你自己）说的话里出现这个符号，就会被拆成多条气泡逐条弹出；连续输两个符号表示字面量</small>
+      </div>
+      <div class="switch-row">
+        <div class="switch" id="switchMulti"></div>
+        <span>允许连锁接话（同一角色一轮可多次发言，互相反驳、追问、起哄）</span>
+      </div>
+      <div class="form-item">
+        <label>一轮最多气泡数</label>
+        <input type="number" id="realMaxMsg" min="1" max="30" step="1" value="8">
+        <small class="dlg-hint">分段与连锁都算在内，防止模型一次灌十几条</small>
+      </div>
+
+      <div class="sec-title">输入中提示</div>
+      <div class="switch-row">
+        <div class="switch" id="switchTyping"></div>
+        <span>显示「输入中…」气泡</span>
+      </div>
+      <div class="form-item">
+        <label>最多显示几个人名</label>
+        <input type="number" id="realTypingNames" min="0" max="10" step="1" value="3">
+        <small class="dlg-hint">人数不超过这个值时点名「A、B、C 输入中…」，超过则显示「N 人输入中…」；填 0 表示只显示人数</small>
+      </div>
+      <div class="form-item">
+        <label>打字速度倍率</label>
+        <input type="number" id="realTypeSpeed" min="0.2" max="5" step="0.1" value="1">
+        <small class="dlg-hint">1 = 按字数拟真（字越多打越久）；调大更快，调小更慢</small>
+      </div>
+      <div class="switch-row">
+        <div class="switch" id="switchInterrupt"></div>
+        <span>偶发「打了一半又删掉」</span>
+      </div>
+
+      <div class="sec-title">其它拟真细节</div>
+      <div class="switch-row">
+        <div class="switch" id="switchRead"></div>
+        <span>已读回执（对方回复后，你的消息显示「已读」）</span>
+      </div>
+      <div class="switch-row">
+        <div class="switch" id="switchDivider"></div>
+        <span>间隔超过 5 分钟插入时间分隔条</span>
+      </div>
+      <div class="switch-row">
+        <div class="switch" id="switchMerge"></div>
+        <span>同一人连续发言合并头像</span>
+      </div>
+      <div class="switch-row">
+        <div class="switch" id="switchTimeAw"></div>
+        <span>时段语感（把当前时间告诉模型：深夜会困、饭点聊吃什么）</span>
+      </div>
+
+      <div class="row-btns">
+        <button id="btnRealSave" type="button">保存并应用</button>
+        <button id="btnRealReset" class="btn-ghost" type="button">恢复默认</button>
+      </div>
+      <div class="empty-tip" id="realStatus">当前状态：未设置</div>
+      <div class="dlg-hint">点任意气泡可展开「引用 / 表情回应 / 撤回」操作；引用后发送的消息会带上被引用原文，模型会针对它回应。</div>
+    </div>
+
+    <div class="tab-content" id="memTab">
+      <div class="row-btns">
+        <button id="btnSummary" type="button">总结本房间记忆</button>
+        <button id="btnAddMem" type="button">＋ 手动添加一条</button>
+        <button id="btnToggleRawMem" class="btn-ghost" type="button">整体编辑文本</button>
+      </div>
+      <div id="memListWrap"></div>
+      <div id="rawMemWrap" style="display:none">
+        <textarea id="globalMemInput" style="height:170px;width:100%;border:1px solid var(--border);border-radius:6px;padding:8px;background:var(--bg);color:var(--text)"></textarea>
+        <div class="row-btns">
+          <button id="btnSaveMem" type="button">保存全局记忆</button>
+        </div>
+        <small>整体编辑会覆盖上面列表里的全部条目，请谨慎使用</small>
+      </div>
+      <small>总结会把本房间对话压缩成摘要，并作为一条新记忆追加到这里</small>
+    </div>
+
+    <div class="tab-content" id="sumTab">
+      <div class="row-btns">
+        <button id="btnSummary2" type="button">立即总结本房间</button>
+        <button id="btnClearHistory" class="btn-ghost" type="button">清空本房间聊天历史</button>
+      </div>
+      <div id="sumListWrap"></div>
+      <small>每条摘要都可以单独编辑或删除；时间为服务器 UTC 时间</small>
+    </div>
+
+    <button class="btn-close" id="btnCloseModal" type="button">关闭</button>
+  </div>
+</div>
+
+<div class="mask" id="bgMask">
+  <div class="modal">
+    <h3>聊天背景</h3>
+    <div class="sec-title">当前背景</div>
+    <div class="bg-cur" id="bgCur"><div class="bc-txt">未设置（跟随主题底色）</div></div>
+
+    <div class="sec-title">内置预设</div>
+    <div class="bg-grid" id="bgGrid"></div>
+
+    <div class="sec-title">自定义</div>
+    <div class="form-item">
+      <label class="upload-label">📁 上传图片作为背景<input type="file" class="file-input" id="bgFileIn" accept="image/*"></label>
+      <small class="dlg-hint">图片会压缩后保存在服务端，仅本房间可见；也可点「应用到所有房间」存为全局默认。</small>
+    </div>
+    <div class="form-item">
+      <label>纯色 / 渐变（CSS 颜色值）</label>
+      <input id="bgColorIn" placeholder="例如 #dfe9f3 或 linear-gradient(#e0eafc,#cfdef3)">
+    </div>
+    <div class="row-btns">
+      <button id="btnBgApplyRoom" type="button">仅应用到本房间</button>
+      <button id="btnBgApplyAll" class="btn-ghost" type="button">应用到所有房间</button>
+      <button id="btnBgReset" class="btn-ghost" type="button">恢复默认</button>
+    </div>
+    <button class="btn-close" id="btnBgClose" type="button">关闭</button>
+  </div>
+</div>
+
+<div class="dlg-mask" id="agcDialog">
+  <div class="dlg-box">
+    <div class="dlg-title">提示</div>
+    <div class="dlg-body"></div>
+    <div class="dlg-foot">
+      <button class="dlg-cancel" type="button">取消</button>
+      <button class="dlg-ok" type="button">确定</button>
+    </div>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox">
+  <button class="lb-nav" id="lbPrev" type="button">‹</button>
+  <img id="lightboxImg" alt="">
+  <button class="lb-nav" id="lbNext" type="button">›</button>
+  <div class="lb-counter" id="lbCounter"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<noscript id="agcNoScript">
+  <h3>浏览器未执行任何脚本</h3>
+  本页面全部逻辑由同目录的 <code>app.js</code> 提供（<code>index.html</code> 内不含任何内联脚本）。<br><br>
+  若这条提示显示出来，说明浏览器禁用了 JavaScript，请在浏览器设置中放行本站点后刷新。
+</noscript>
+
+<div id="agcDiag" class="min">
+  <div id="agcDiagHead"><span>AI群聊 · 自检面板</span><span id="agcDiagToggle">收起 −</span></div>
+  <div id="agcDiagBody">初始化中…</div>
+</div>
+
+<div id="bootHint">
+  页面脚本尚未执行。若这条提示一直显示，说明 <b>index.html 里的 &lt;script&gt; 没有被宿主执行</b>
+  （若左下角"自检面板"也没出现，说明整段脚本确实没跑）。
+</div>
+
+<script src="./app.js"></script>
+</body>
+</html>
