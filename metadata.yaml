@@ -1,0 +1,12 @@
+name: ai_groupchat
+display_name: AI 趣味群聊
+short_desc: "QQ化社交面板|会话列表|好友|动态|资料主页|1V1私聊|亲密度标识|戳一戳|拟真作息"
+desc: "QQ 移动端风格 AI 社交面板：底部消息/好友/动态/设置四 Tab；会话列表聚合群聊与私聊（摘要、时间、未读红点、置顶/免打扰/删除）；角色资料主页（头像、签名心情、访问量、亲密度徽章、个人动态流、发起私聊、戳一戳）；1V1 私聊隔离上下文；角色发言小概率更新签名心情或发布说说；动态信息流点赞评论与角色间环境互动；亲密度累计点亮畅聊之火/三叶草/巨轮；24 小时作息在线状态与拟真回复延迟；并保留 v1.9 全部拟真群聊能力：分段刷屏、连锁接话、输入中提示、引用/表情回应/撤回、已读回执、时间分隔条、记忆摘要、自主对话、发图识图。"
+version: "2.1.0"
+author: "Qwen、Doubao、hyaku"
+entry: main.py
+astrbot_version: ">=4.28,<5"
+dashboard: "pages/chatroom/index.html"
+repo: ""
+support_platforms:
+  - aiocqhttp

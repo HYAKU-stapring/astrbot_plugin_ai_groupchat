@@ -1,0 +1,56 @@
+{
+  "llm_provider": {
+    "description": "使用AstrBot里配置的模型提供者ID",
+    "type": "string",
+    "hint": "在「模型提供商」页面复制 provider id；留空则自动使用当前默认对话模型",
+    "default": ""
+  },
+  "vision_enabled": {
+    "description": "开启发图识图",
+    "type": "bool",
+    "hint": "开启后，前端发送的图片会一并交给模型识别；若所选模型不支持视觉，后端会自动降级为纯文本并在页面提示",
+    "default": true
+  },
+  "max_image_side": {
+    "description": "识图前图片最长边（像素）",
+    "type": "int",
+    "hint": "用于压缩上传体积，默认 1024；填 0 表示不压缩",
+    "default": 1024
+  },
+  "auto_talk_max_rounds": {
+    "description": "自主对话单次最多连续轮数",
+    "type": "int",
+    "hint": "前端定时器按你设置的间隔+随机偏移循环调用；此处为服务端兜底上限，0 表示不限制",
+    "default": 0
+  },
+  "mood_change_chance": {
+    "description": "角色更新签名/心情的概率（%）",
+    "type": "int",
+    "hint": "每轮对话中，模型给出新签名或心情时按此概率采纳；0~100，默认 12",
+    "default": 12
+  },
+  "moment_chance": {
+    "description": "角色发动态说说的概率（%）",
+    "type": "int",
+    "hint": "每轮对话中，模型给出动态内容时按此概率发布到个人主页；0~100，默认 6",
+    "default": 6
+  },
+  "moment_comment_chance": {
+    "description": "动态评论被采纳的概率（%）",
+    "type": "int",
+    "hint": "模型在同一次调用里顺带生成其他角色的动态评论时，按此概率落库；0~100，默认 40",
+    "default": 40
+  },
+  "forward_chance": {
+    "description": "角色转发私聊截图的概率（%）",
+    "type": "int",
+    "hint": "模型给出 forward_from 字段时按此概率生成「转发自 xxx」引用条；0~100，默认 8",
+    "default": 8
+  },
+  "timezone_offset": {
+    "description": "时区偏移（小时）",
+    "type": "int",
+    "hint": "用于角色作息/时段语感的本地时间计算，8 = 东八区（中国大陆）；服务器时区与你不一致时在此校正。数据库仍统一存 UTC，前端按浏览器本地时区展示",
+    "default": 8
+  }
+}
